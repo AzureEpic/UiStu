@@ -1,0 +1,240 @@
+-- uilib.lua
+-- put this on GitHub raw and load with loadstring(game:HttpGet("RAW_URL"))
+
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+local library = {
+    Themes = {
+        Default = {
+            WindowBg = Color3.fromRGB(30, 30, 30),
+            TitleBg  = Color3.fromRGB(20, 20, 20),
+            Text     = Color3.fromRGB(255, 255, 255),
+            Accent   = Color3.fromRGB(0, 170, 255),
+        }
+    }
+}
+
+-- helper to make instances
+local function new(class, props, parent)
+    local obj = Instance.new(class)
+    for k,v in pairs(props or {}) do obj[k] = v end
+    if parent then obj.Parent = parent end
+    return obj
+end
+
+-- draggable behavior
+local function makeDraggable(frame, dragHandle)
+    dragHandle = dragHandle or frame
+    local dragging, startPos, startMouse = false, nil, nil
+    dragHandle.InputBegan:Connect(function(inp)
+        if inp.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            startMouse = inp.Position
+            startPos = frame.Position
+        end
+    end)
+    dragHandle.InputChanged:Connect(function(inp)
+        if inp.UserInputType == Enum.UserInputType.MouseMovement then
+            if dragging then
+                local delta = inp.Position - startMouse
+                frame.Position = UDim2.new(
+                    startPos.X.Scale, startPos.X.Offset + delta.X,
+                    startPos.Y.Scale, startPos.Y.Offset + delta.Y
+                )
+            end
+        end
+    end)
+    UserInputService.InputEnded:Connect(function(inp)
+        if inp.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end)
+end
+
+function library:CreateWindow(opts)
+    opts = opts or {}
+    local theme = self.Themes[opts.Theme] or self.Themes.Default
+
+    -- ScreenGui
+    local screen = new("ScreenGui", {Name = opts.Name or "UIWindow"}, PlayerGui)
+    screen.ResetOnSpawn = false
+
+    -- Main window frame
+    local win = new("Frame", {
+        Name = "Window",
+        Size = UDim2.new(0, opts.Width or 400, 0, opts.Height or 300),
+        Position = UDim2.new(0.5, -(opts.Width or 400)/2, 0.5, -(opts.Height or 300)/2),
+        BackgroundColor3 = theme.WindowBg,
+        Parent = screen,
+    })
+
+    -- Title bar
+    local titleBar = new("Frame", {
+        Name = "TitleBar",
+        Size = UDim2.new(1, 0, 0, 30),
+        BackgroundColor3 = theme.TitleBg,
+        Parent = win,
+    })
+    new("TextLabel", {
+        Name = "Title",
+        Text = opts.Title or "Window",
+        Size = UDim2.new(1, 0, 1, 0),
+        BackgroundTransparency = 1,
+        TextColor3 = theme.Text,
+        Font = Enum.Font.GothamBold,
+        TextSize = 18,
+        Parent = titleBar,
+    })
+
+    makeDraggable(win, titleBar)
+
+    local window = {Container = win, Theme = theme}
+    window.__index = window
+
+    -- internal layout offset
+    window._nextY = 40
+
+    -- create a new element container
+    function window:AddElement(elem)
+        elem.Position = UDim2.new(0, 10, 0, window._nextY)
+        elem.Parent = window.Container
+        window._nextY = window._nextY + elem.Size.Y.Offset + 10
+        return elem
+    end
+
+    -- button
+    function window:MakeButton(opts)
+        local btn = new("TextButton", {
+            Text = opts.Name or "Button",
+            Size = UDim2.new(0, opts.Width or 120, 0, opts.Height or 30),
+            BackgroundColor3 = self.Theme.Accent,
+            TextColor3 = self.Theme.Text,
+            Font = Enum.Font.Gotham,
+            TextSize = 16,
+        })
+        btn.MouseButton1Click:Connect(function()
+            TweenService:Create(btn, TweenInfo.new(0.1), {BackgroundColor3 = self.Theme.TitleBg}):Play()
+            task.wait(0.1)
+            TweenService:Create(btn, TweenInfo.new(0.1), {BackgroundColor3 = self.Theme.Accent}):Play()
+            if opts.Callback then
+                opts.Callback()
+            end
+        end)
+        return self:AddElement(btn)
+    end
+
+    -- toggle
+    function window:MakeToggle(opts)
+        local frame = new("Frame", {Size = UDim2.new(0, 150, 0, 30)})
+        local label = new("TextLabel", {
+            Text = opts.Name or "Toggle",
+            Size = UDim2.new(0, 100, 1, 0),
+            BackgroundTransparency = 1,
+            TextColor3 = self.Theme.Text,
+            Font = Enum.Font.Gotham,
+            TextSize = 14,
+            Parent = frame,
+        })
+        local btn = new("TextButton", {
+            Text = opts.Default and "On" or "Off",
+            Size = UDim2.new(0, 40, 0, 20),
+            Position = UDim2.new(0, 100, 0, 5),
+            BackgroundColor3 = opts.Default and Color3.fromRGB(0,200,0) or Color3.fromRGB(200,0,0),
+            TextColor3 = self.Theme.Text,
+            Font = Enum.Font.GothamBold,
+            TextSize = 12,
+            Parent = frame,
+        })
+        local state = opts.Default or false
+        btn.MouseButton1Click:Connect(function()
+            state = not state
+            btn.Text = state and "On" or "Off"
+            btn.BackgroundColor3 = state and Color3.fromRGB(0,200,0) or Color3.fromRGB(200,0,0)
+            if opts.Callback then opts.Callback(state) end
+        end)
+        return self:AddElement(frame)
+    end
+
+    -- dropdown
+    function window:MakeDropdown(opts)
+        local container = new("Frame", {Size = UDim2.new(0, 200, 0, 30)})
+        local label = new("TextLabel", {
+            Text = opts.Name or "Dropdown",
+            Size = UDim2.new(0, 100, 1, 0),
+            BackgroundTransparency = 1,
+            TextColor3 = self.Theme.Text,
+            Font = Enum.Font.Gotham,
+            TextSize = 14,
+            Parent = container,
+        })
+        local btn = new("TextButton", {
+            Text = opts.Options[1] or "",
+            Size = UDim2.new(0, 80, 0, 20),
+            Position = UDim2.new(0, 100, 0, 5),
+            BackgroundColor3 = self.Theme.Accent,
+            TextColor3 = self.Theme.Text,
+            Font = Enum.Font.Gotham,
+            TextSize = 12,
+            Parent = container,
+        })
+        local listOpen = false
+        local listFrame
+        btn.MouseButton1Click:Connect(function()
+            listOpen = not listOpen
+            if listOpen then
+                listFrame = new("Frame", {
+                    Size = UDim2.new(0, 100, 0, #opts.Options*20),
+                    Position = UDim2.new(0, 100, 0, 30),
+                    BackgroundColor3 = self.Theme.WindowBg,
+                    Parent = container,
+                })
+                for i,option in ipairs(opts.Options) do
+                    local item = new("TextButton", {
+                        Text = option,
+                        Size = UDim2.new(1, 0, 0, 20),
+                        Position = UDim2.new(0, 0, 0, (i-1)*20),
+                        BackgroundTransparency = 1,
+                        TextColor3 = self.Theme.Text,
+                        Font = Enum.Font.Gotham,
+                        TextSize = 12,
+                        Parent = listFrame,
+                    })
+                    item.MouseButton1Click:Connect(function()
+                        btn.Text = option
+                        listFrame:Destroy()
+                        listOpen = false
+                        if opts.Callback then opts.Callback(option) end
+                    end)
+                end
+            else
+                if listFrame then listFrame:Destroy() end
+            end
+        end)
+        return self:AddElement(container)
+    end
+
+    -- text input
+    function window:MakeTextInput(opts)
+        local box = new("TextBox", {
+            Text = opts.Placeholder or "",
+            ClearTextOnFocus = false,
+            Size = UDim2.new(0, opts.Width or 200, 0, 30),
+            BackgroundColor3 = self.Theme.TitleBg,
+            TextColor3 = self.Theme.Text,
+            Font = Enum.Font.Gotham,
+            TextSize = 14,
+        })
+        box.FocusLost:Connect(function(enterPressed)
+            if opts.Callback then opts.Callback(box.Text) end
+        end)
+        return self:AddElement(box)
+    end
+
+    return setmetatable(window, window)
+end
+
+return library
