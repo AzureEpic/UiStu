@@ -1,4 +1,4 @@
--- uilib.lua (host this at https://raw.githubusercontent.com/AzureEpic/UiStu/refs/heads/main/sk)
+-- uilib.lua @ https://raw.githubusercontent.com/AzureEpic/UiStu/refs/heads/main/sk
 
 local TweenService       = game:GetService("TweenService")
 local UserInputService   = game:GetService("UserInputService")
@@ -13,6 +13,7 @@ local library = {
             TitleBg  = Color3.fromRGB(20, 20, 20),
             Text     = Color3.fromRGB(255, 255, 255),
             Accent   = Color3.fromRGB(0, 170, 255),
+            Border   = Color3.fromRGB(50, 50, 50),
         }
     }
 }
@@ -20,29 +21,26 @@ local library = {
 -- helper: make instance & apply props
 local function new(class, props, parent)
     local obj = Instance.new(class)
-    for k, v in pairs(props or {}) do
-        obj[k] = v
-    end
-    if parent then
-        obj.Parent = parent
-    end
+    for k,v in pairs(props or {}) do obj[k] = v end
+    if parent then obj.Parent = parent end
     return obj
 end
 
--- draggable behaviour
+-- draggable for both mouse & touch
 local function makeDraggable(frame, handle)
     handle = handle or frame
-    local dragging, startPos, startMouse
+    local dragging, startPos, startInput
     handle.InputBegan:Connect(function(inp)
-        if inp.UserInputType == Enum.UserInputType.MouseButton1 then
+        if inp.UserInputType == Enum.UserInputType.MouseButton1
+        or inp.UserInputType == Enum.UserInputType.Touch then
             dragging   = true
-            startMouse = inp.Position
+            startInput = inp.Position
             startPos   = frame.Position
         end
     end)
     handle.InputChanged:Connect(function(inp)
-        if inp.UserInputType == Enum.UserInputType.MouseMovement and dragging then
-            local delta = inp.Position - startMouse
+        if dragging and inp.UserInputType == Enum.UserInputType.MouseMovement or inp.UserInputType == Enum.UserInputType.Touch then
+            local delta = inp.Position - startInput
             frame.Position = UDim2.new(
                 startPos.X.Scale, startPos.X.Offset + delta.X,
                 startPos.Y.Scale, startPos.Y.Offset + delta.Y
@@ -50,7 +48,8 @@ local function makeDraggable(frame, handle)
         end
     end)
     UserInputService.InputEnded:Connect(function(inp)
-        if inp.UserInputType == Enum.UserInputType.MouseButton1 then
+        if inp.UserInputType == Enum.UserInputType.MouseButton1
+        or inp.UserInputType == Enum.UserInputType.Touch then
             dragging = false
         end
     end)
@@ -62,36 +61,42 @@ function library:CreateWindow(opts)
 
     -- ScreenGui
     local screen = new("ScreenGui", {
-        Name          = (opts.Name or "UI").."ScreenGui",
-        ResetOnSpawn  = false,
+        Name         = (opts.Name or "UI").."ScreenGui",
+        ResetOnSpawn = false,
     }, PlayerGui)
 
-    -- Main frame
+    -- Main window
     local win = new("Frame", {
-        Name            = (opts.Name or "UI").."Window",
-        Size            = UDim2.new(0, opts.Width or 400, 0, opts.Height or 300),
-        Position        = UDim2.new(0.5, -(opts.Width or 400)/2, 0.5, -(opts.Height or 300)/2),
-        BackgroundColor3= theme.WindowBg,
-        ZIndex          = 1,
+        Name             = (opts.Name or "UI").."Window",
+        Size             = UDim2.new(0, opts.Width or 400, 0, opts.Height or 300),
+        Position         = UDim2.new(0.5, -(opts.Width or 400)/2, 0.5, -(opts.Height or 300)/2),
+        BackgroundColor3 = theme.WindowBg,
+        ZIndex           = 1,
     }, screen)
+    -- styling
+    new("UICorner", {CornerRadius = UDim.new(0,8)}, win)
+    new("UIStroke", {Color = theme.Border, Thickness = 1}, win)
 
     -- Title bar
     local titleBar = new("Frame", {
-        Name            = "TitleBar",
-        Size            = UDim2.new(1, 0, 0, 30),
-        BackgroundColor3= theme.TitleBg,
-        ZIndex          = 2,
-    }, win)
+        Name             = "TitleBar",
+        Size             = UDim2.new(1,0,0,30),
+        BackgroundColor3 = theme.TitleBg,
+        ZIndex           = 2,
+        Parent           = win,
+    })
+    new("UICorner", {CornerRadius = UDim.new(0,8)}, titleBar)
     new("TextLabel", {
         Name               = "TitleLabel",
         Text               = opts.Title or "Window",
-        Size               = UDim2.new(1, 0, 1, 0),
+        Size               = UDim2.new(1,0,1,0),
         BackgroundTransparency = 1,
         TextColor3         = theme.Text,
         Font               = Enum.Font.GothamBold,
         TextSize           = 18,
         ZIndex             = 3,
-    }, titleBar)
+        Parent             = titleBar,
+    })
 
     makeDraggable(win, titleBar)
 
@@ -100,9 +105,8 @@ function library:CreateWindow(opts)
     window.__index = window
     window._nextY  = 40
 
-    -- helper to place and parent new elements
     function window:AddElement(elem)
-        elem.Position = UDim2.new(0, 10, 0, window._nextY)
+        elem.Position = UDim2.new(0,10,0,window._nextY)
         elem.Parent   = window.Container
         window._nextY = window._nextY + elem.Size.Y.Offset + 10
         return elem
@@ -111,20 +115,21 @@ function library:CreateWindow(opts)
     -- BUTTON
     function window:MakeButton(opts)
         local name = opts.Name or "Button"
-        local btn = new("TextButton", {
-            Name               = name.."Button",
-            Text               = name,
-            Size               = UDim2.new(0, opts.Width or 120, 0, opts.Height or 30),
-            BackgroundColor3   = self.Theme.Accent,
-            TextColor3         = self.Theme.Text,
-            Font               = Enum.Font.Gotham,
-            TextSize           = 16,
-            ZIndex             = 4,
+        local btn  = new("TextButton", {
+            Name             = name.."Button",
+            Text             = name,
+            Size             = UDim2.new(0, opts.Width or 120, 0, opts.Height or 30),
+            BackgroundColor3 = self.Theme.Accent,
+            TextColor3       = self.Theme.Text,
+            Font             = Enum.Font.Gotham,
+            TextSize         = 16,
+            ZIndex           = 4,
         })
+        new("UICorner", {CornerRadius = UDim.new(0,4)}, btn)
         btn.MouseButton1Click:Connect(function()
-            TweenService:Create(btn, TweenInfo.new(0.1), {BackgroundColor3 = self.Theme.TitleBg}):Play()
-            task.wait(0.1)
-            TweenService:Create(btn, TweenInfo.new(0.1), {BackgroundColor3 = self.Theme.Accent}):Play()
+            TweenService:Create(btn, TweenInfo.new(0.12), {BackgroundColor3 = self.Theme.TitleBg}):Play()
+            task.wait(0.12)
+            TweenService:Create(btn, TweenInfo.new(0.12), {BackgroundColor3 = self.Theme.Accent}):Play()
             if opts.Callback then opts.Callback() end
         end)
         return self:AddElement(btn)
@@ -134,31 +139,35 @@ function library:CreateWindow(opts)
     function window:MakeToggle(opts)
         local name  = opts.Name or "Toggle"
         local frame = new("Frame", {
-            Name    = name.."ToggleFrame",
-            Size    = UDim2.new(0, 150, 0, 30),
-            ZIndex  = 4,
+            Name   = name.."ToggleFrame",
+            Size   = UDim2.new(0,150,0,30),
+            ZIndex = 4,
         })
+        new("UICorner", {CornerRadius = UDim.new(0,4)}, frame)
         new("TextLabel", {
             Name               = name.."Label",
             Text               = name,
-            Size               = UDim2.new(0, 100, 1, 0),
+            Size               = UDim2.new(0,100,1,0),
             BackgroundTransparency = 1,
             TextColor3         = self.Theme.Text,
             Font               = Enum.Font.Gotham,
             TextSize           = 14,
             ZIndex             = 5,
-        }, frame)
+            Parent             = frame,
+        })
         local btn = new("TextButton", {
-            Name               = name.."ToggleButton",
-            Text               = opts.Default and "On" or "Off",
-            Size               = UDim2.new(0, 40, 0, 20),
-            Position           = UDim2.new(0, 100, 0, 5),
-            BackgroundColor3   = opts.Default and Color3.fromRGB(0,200,0) or Color3.fromRGB(200,0,0),
-            TextColor3         = self.Theme.Text,
-            Font               = Enum.Font.GothamBold,
-            TextSize           = 12,
-            ZIndex             = 6,
-        }, frame)
+            Name             = name.."ToggleButton",
+            Text             = opts.Default and "On" or "Off",
+            Size             = UDim2.new(0,40,0,20),
+            Position         = UDim2.new(0,100,0,5),
+            BackgroundColor3 = opts.Default and Color3.fromRGB(0,200,0) or Color3.fromRGB(200,0,0),
+            TextColor3       = self.Theme.Text,
+            Font             = Enum.Font.GothamBold,
+            TextSize         = 12,
+            ZIndex           = 6,
+            Parent           = frame,
+        })
+        new("UICorner", {CornerRadius = UDim.new(0,4)}, btn)
         local state = opts.Default or false
         btn.MouseButton1Click:Connect(function()
             state = not state
@@ -173,68 +182,108 @@ function library:CreateWindow(opts)
     function window:MakeDropdown(opts)
         local name      = opts.Name or "Dropdown"
         local container = new("Frame", {
-            Name    = name.."DropdownFrame",
-            Size    = UDim2.new(0, 200, 0, 30),
-            ZIndex  = 4,
+            Name   = name.."DropdownFrame",
+            Size   = UDim2.new(0,200,0,30),
+            ZIndex = 4,
         })
-        new("TextLabel", {
+        new("UICorner", {CornerRadius = UDim.new(0,4)}, container)
+        local label = new("TextLabel", {
             Name               = name.."Label",
             Text               = name,
-            Size               = UDim2.new(0, 100, 1, 0),
+            Size               = UDim2.new(0,100,1,0),
             BackgroundTransparency = 1,
             TextColor3         = self.Theme.Text,
             Font               = Enum.Font.Gotham,
             TextSize           = 14,
             ZIndex             = 5,
-        }, container)
+            Parent             = container,
+        })
         local btn = new("TextButton", {
-            Name               = name.."Button",
-            Text               = opts.Options[1] or "",
-            Size               = UDim2.new(0, 80, 0, 20),
-            Position           = UDim2.new(0, 100, 0, 5),
-            BackgroundColor3   = self.Theme.Accent,
-            TextColor3         = self.Theme.Text,
-            Font               = Enum.Font.Gotham,
-            TextSize           = 12,
-            ZIndex             = 6,
-        }, container)
-        local open, listFrame = false, nil
+            Name             = name.."Button",
+            Text             = opts.Options[1] or "",
+            Size             = UDim2.new(0,80,0,20),
+            Position         = UDim2.new(0,100,0,5),
+            BackgroundColor3 = self.Theme.Accent,
+            TextColor3       = self.Theme.Text,
+            Font             = Enum.Font.Gotham,
+            TextSize         = 12,
+            ZIndex           = 6,
+            Parent           = container,
+        })
+        new("UICorner", {CornerRadius = UDim.new(0,4)}, btn)
+
+        -- state + storage
+        container._open    = false
+        container._options = opts.Options
+        container._label   = label
+        container._button  = btn
+        container._list    = nil
+
+        local function closeList()
+            if container._list then
+                TweenService:Create(container._list, TweenInfo.new(0.1), {Size = UDim2.new(0,100,0,0)}):Play()
+                task.delay(0.1, function()
+                    if container._list then container._list:Destroy() end
+                end)
+            end
+            container._open = false
+        end
 
         btn.MouseButton1Click:Connect(function()
-            open = not open
-            if open then
-                listFrame = new("Frame", {
+            if container._open then
+                closeList()
+            else
+                -- build list
+                local list = new("Frame", {
                     Name            = name.."DropdownList",
-                    Size            = UDim2.new(0, 100, 0, #opts.Options * 20),
-                    Position        = UDim2.new(0, 100, 0, 30),
+                    Size            = UDim2.new(0,100,0,0),
+                    Position        = UDim2.new(0,100,0,30),
                     BackgroundColor3= self.Theme.WindowBg,
                     ZIndex          = 50,
-                }, container)
-
-                for i, option in ipairs(opts.Options) do
+                    Parent          = container,
+                })
+                new("UICorner", {CornerRadius = UDim.new(0,4)}, list)
+                -- animate open
+                TweenService:Create(list, TweenInfo.new(0.15), {Size = UDim2.new(0,100,0,#container._options*20)}):Play()
+                -- add options
+                for i,option in ipairs(container._options) do
                     local item = new("TextButton", {
                         Name            = name.."Option"..i,
                         Text            = option,
-                        Size            = UDim2.new(1, 0, 0, 20),
-                        Position        = UDim2.new(0, 0, 0, (i - 1) * 20),
+                        Size            = UDim2.new(1,0,0,20),
+                        Position        = UDim2.new(0,0,0,(i-1)*20),
                         BackgroundTransparency = 1,
                         TextColor3      = self.Theme.Text,
                         Font            = Enum.Font.Gotham,
                         TextSize        = 12,
                         ZIndex          = 51,
-                        Parent          = listFrame,
+                        Parent          = list,
                     })
                     item.MouseButton1Click:Connect(function()
                         btn.Text = option
-                        listFrame:Destroy()
-                        open = false
                         if opts.Callback then opts.Callback(option) end
+                        closeList()
                     end)
                 end
-            else
-                if listFrame then listFrame:Destroy() end
+                container._list = list
+                container._open = true
             end
         end)
+
+        -- updater method
+        function container:Update(newOpts)
+            -- newOpts = {Name=?, Options={…}}
+            if newOpts.Name then
+                self._label.Text = newOpts.Name
+            end
+            if newOpts.Options then
+                self._options = newOpts.Options
+                self._button.Text = newOpts.Options[1] or ""
+            end
+            if self._open then
+                closeList()
+            end
+        end
 
         return self:AddElement(container)
     end
@@ -242,7 +291,7 @@ function library:CreateWindow(opts)
     -- TEXT INPUT
     function window:MakeTextInput(opts)
         local name = opts.Name or "Input"
-        local box = new("TextBox", {
+        local box  = new("TextBox", {
             Name            = name.."TextBox",
             Text            = "",
             PlaceholderText = opts.Placeholder or "",
@@ -253,7 +302,8 @@ function library:CreateWindow(opts)
             Font            = Enum.Font.Gotham,
             TextSize        = 14,
             ZIndex          = 4,
-        })
+        }, nil)
+        new("UICorner", {CornerRadius = UDim.new(0,4)}, box)
         box.FocusLost:Connect(function(enter)
             if enter and opts.Callback then opts.Callback(box.Text) end
         end)
