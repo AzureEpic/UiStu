@@ -4,21 +4,21 @@ local UI = loadstring(game:HttpGet("https://raw.githubusercontent.com/AzureEpic/
 
 local win = UI:CreateWindow({
     Name   = "MyCoolUI",
-    Title  = "Epic Interface",
+    Title  = "random",
     Theme  = "Default",
     Width  = 450,
     Height = 350,
 })
 
 win:MakeButton({
-    Name     = "Press Me!",
+    Name     = "those who",
     Callback = function()
-        print("Button pressed, yasss! 🎉")
+        print("those who know")
     end
 })
 
 win:MakeToggle({
-    Name     = "Enable Mode",
+    Name     = "Enable sybau mode",
     Default  = false,
     Callback = function(state)
         print("Toggle is now:", state)
